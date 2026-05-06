@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # test_session_end.sh — validate session-end.sh hook behaviour
 #
-# Covers three scenarios from design memo §6:
+# Covers four scenarios:
 #   SE-1: SessionEnd deletes only its own session file; all other files survive.
 #   SE-2: Malicious session_id (path-traversal) is sanitized; real /etc/passwd untouched.
 #   SE-3: Empty STATE_DIR + nonexistent session_id → exit 0, no output.
+#   SE-4: STATE_DIR completely absent (never created) → exit 0, no output.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -89,5 +90,18 @@ SE3_EXIT=$?
 
 assert_equal "$SE3_EXIT" "0" "SE-3: session-end must exit 0 when target file absent"
 assert_equal "$OUTPUT" "" "SE-3: session-end must produce no output when target file absent"
+
+# --- SE-4: STATE_DIR completely absent -----------------------------------
+# Stronger than SE-3: not just an empty dir — the dir itself does not exist.
+# session-end.sh must still exit 0 and produce no output.
+rm -rf "$STATE_DIR"
+# Also remove the parent so we are sure nothing exists below ~/.claude/state.
+rm -rf "${HOME}/.claude/state"
+
+OUTPUT4=$(run_session_end "session-with-no-state-dir" 2>&1)
+SE4_EXIT=$?
+
+assert_equal "$SE4_EXIT" "0" "SE-4: session-end must exit 0 when STATE_DIR is absent"
+assert_equal "$OUTPUT4" "" "SE-4: session-end must produce no output when STATE_DIR is absent"
 
 echo "[PASS] test_session_end"

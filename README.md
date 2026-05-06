@@ -143,8 +143,8 @@ This removes both the `UserPromptSubmit` and `SessionEnd` hook entries from `~/.
 
 The first prompt of any session should always fire an injection. Check `~/.claude/state/time-inject/` — you should see one `.json` file per session ID. If it's empty:
 
-- Verify `~/.claude/settings.json` has the hook entry under `hooks.userPromptSubmit`.
-- Confirm the `path` points to your `inject-time-context.sh` script (not a stale path).
+- Verify `~/.claude/settings.json` has an entry under `hooks.UserPromptSubmit` (PascalCase, an array).
+- Confirm the `command` field inside that entry's `hooks` array points to your `inject-time-context.sh` script (not a stale path).
 - Try the one-line install again to refresh the config.
 
 ### "Hook fires but injection is missing from the conversation"
