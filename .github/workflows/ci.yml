@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify dependencies
+        run: |
+          echo "--- bash ---"
+          bash --version | head -1
+
+          echo "--- python3 ---"
+          python3 --version
+
+          echo "--- jq ---"
+          if ! command -v jq &>/dev/null; then
+            echo "jq not found — will install"
+            if [[ "$RUNNER_OS" == "Linux" ]]; then
+              sudo apt-get install -y jq
+            elif [[ "$RUNNER_OS" == "macOS" ]]; then
+              brew install jq
+            fi
+          fi
+          jq --version
+
+      - name: Make scripts executable
+        run: |
+          chmod +x hooks/*.sh
+          chmod +x tests/*.sh
+          # scripts/ may contain additional helper scripts
+          if compgen -G "scripts/*.sh" > /dev/null 2>&1; then
+            chmod +x scripts/*.sh
+          fi
+
+      - name: Run test suite
+        run: bash tests/run-tests.sh
