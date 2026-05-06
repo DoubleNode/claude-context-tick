@@ -13,7 +13,11 @@ FAILURES=()
 
 # Collect and sort test files.
 # Use a find-based approach for portability (avoids glob NOMATCH on empty dirs).
-mapfile -t TEST_FILES < <(find "$SCRIPT_DIR" -maxdepth 1 -name 'test_*.sh' | sort)
+# Read loop instead of `mapfile` because macOS ships bash 3.2 (mapfile is bash 4+).
+TEST_FILES=()
+while IFS= read -r _t; do
+  TEST_FILES+=("$_t")
+done < <(find "$SCRIPT_DIR" -maxdepth 1 -name 'test_*.sh' | sort)
 
 if [[ ${#TEST_FILES[@]} -eq 0 ]]; then
   echo "WARNING: no test_*.sh files found in $SCRIPT_DIR" >&2
