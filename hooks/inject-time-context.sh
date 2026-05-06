@@ -40,6 +40,46 @@ STATE_FILE="${STATE_DIR}/${SESSION_ID}.json"
 mkdir -p "$STATE_DIR" 2>/dev/null || exit 0
 [[ -w "$STATE_DIR" ]] || exit 0
 
+# --- Lazy GC sweep (runs at most once per 24h) ---
+# Returns 0 if a sweep is due (marker absent or >24h old), 1 otherwise.
+_gc_sweep_due() {
+  local marker="$1"
+  if [ ! -f "$marker" ]; then
+    return 0
+  fi
+  python3 -c "
+import os, sys, time
+try:
+    age = time.time() - os.path.getmtime(sys.argv[1])
+    sys.exit(0 if age >= 86400 else 1)
+except Exception:
+    sys.exit(1)
+" "$marker" 2>/dev/null
+  return $?
+}
+
+# Enumerate and remove session state files whose mtime is >7 days old.
+# Belt-and-suspenders: the glob *.json already excludes .gc-sweep (no .json
+# extension), but the find pattern makes the exclusion explicit.
+# Uses find -mtime +7 (floor semantics: files older than 7*24h blocks).
+# Never uses find -delete (flag-order footgun per dev-team policy).
+# All operations silent; function always returns 0.
+_gc_run_sweep() {
+  local marker="${STATE_DIR}/.gc-sweep"
+  _gc_sweep_due "$marker" 2>/dev/null || return 0
+  # Prune stale .json session files; explicitly exclude the marker and .tmp.* files
+  find "$STATE_DIR" -maxdepth 1 -name "*.json" \
+    ! -name ".gc-sweep" \
+    ! -name ".tmp.*" \
+    -mtime +7 \
+    -print0 2>/dev/null \
+    | xargs -0 rm -f 2>/dev/null || true
+  # Update marker regardless of whether any files were pruned
+  touch "$marker" 2>/dev/null || true
+  return 0
+}
+_gc_run_sweep 2>/dev/null || true
+
 # --- Current values ---
 NOW_DATE=$(date +%Y-%m-%d)
 NOW_TIME=$(date +%H:%M)
@@ -124,5 +164,11 @@ payload = {
 print(json.dumps(payload))
 " "$INJECT"
 fi
+
+# Liveness signal: keep state file mtime fresh so the GC sweep does not expire
+# an active session. Runs even when INJECT is empty (no state change this prompt).
+# MUST be after FIRST_RUN detection and after the state-write block — placing it
+# before FIRST_RUN would pre-create STATE_FILE and break first-run injection.
+touch "$STATE_FILE" 2>/dev/null || true
 
 exit 0

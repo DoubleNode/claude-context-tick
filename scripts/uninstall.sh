@@ -19,9 +19,11 @@ done
 
 SETTINGS_FILE="$HOME/.claude/settings.json"
 HOOK_SCRIPT="$HOME/.claude/hooks/inject-time-context.sh"
+SESSION_END_SCRIPT="$HOME/.claude/hooks/session-end.sh"
 STATE_DIR="$HOME/.claude/state/time-inject"
 
 HOOK_MATCH_PATTERN="inject-time-context.sh"
+SESSION_END_MATCH_PATTERN="session-end.sh"
 
 # ---------------------------------------------------------------------------
 # Pre-flight
@@ -52,11 +54,12 @@ if [ "$SETTINGS_MODIFIED" -eq 1 ]; then
   cp "$SETTINGS_FILE" "$BACKUP"
   echo "Backed up settings: $BACKUP"
 
-  # Remove any UserPromptSubmit entry whose hooks[].command ends with our hook name.
+  # Remove any UserPromptSubmit entry whose hooks[].command ends with our hook name,
+  # and any SessionEnd entry whose hooks[].command ends with session-end.sh.
   # After removal:
-  #   - if UserPromptSubmit array is empty  → drop the key
-  #   - if hooks object is empty            → drop the key
-  PATCHED="$(jq --arg pat "$HOOK_MATCH_PATTERN" '
+  #   - if an event array is empty → drop that key
+  #   - if hooks object is empty   → drop the key
+  PATCHED="$(jq --arg pat "$HOOK_MATCH_PATTERN" --arg pat_se "$SESSION_END_MATCH_PATTERN" '
     if .hooks.UserPromptSubmit? then
       .hooks.UserPromptSubmit |= map(
         .hooks |= map(select(.command | endswith($pat) | not))
@@ -65,11 +68,19 @@ if [ "$SETTINGS_MODIFIED" -eq 1 ]; then
       | if (.hooks.UserPromptSubmit | length) == 0 then
           del(.hooks.UserPromptSubmit)
         else . end
-      | if (.hooks | length) == 0 then
-          del(.hooks)
-        else . end
-    else .
-    end
+    else . end
+    | if .hooks.SessionEnd? then
+        .hooks.SessionEnd |= map(
+          .hooks |= map(select(.command | endswith($pat_se) | not))
+          | select(.hooks | length > 0)
+        )
+        | if (.hooks.SessionEnd | length) == 0 then
+            del(.hooks.SessionEnd)
+          else . end
+      else . end
+    | if (.hooks | length) == 0 then
+        del(.hooks)
+      else . end
   ' "$SETTINGS_FILE")"
 
   # Write atomically
@@ -81,7 +92,7 @@ if [ "$SETTINGS_MODIFIED" -eq 1 ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Optionally remove installed hook script
+# Optionally remove installed hook scripts
 # ---------------------------------------------------------------------------
 remove_hook_script=0
 
@@ -102,6 +113,27 @@ if [ -f "$HOOK_SCRIPT" ]; then
   fi
 else
   echo "Hook script not found at $HOOK_SCRIPT — skipping."
+fi
+
+remove_session_end_script=0
+
+if [ -f "$SESSION_END_SCRIPT" ]; then
+  if [ "$YES_FLAG" -eq 1 ]; then
+    remove_session_end_script=1
+  else
+    read -r -p "Remove installed session-end hook script ($SESSION_END_SCRIPT)? [y/N] " reply
+    case "$reply" in
+      [Yy]*) remove_session_end_script=1 ;;
+      *) echo "Keeping session-end hook script." ;;
+    esac
+  fi
+
+  if [ "$remove_session_end_script" -eq 1 ]; then
+    rm -f "$SESSION_END_SCRIPT"
+    echo "Removed: $SESSION_END_SCRIPT"
+  fi
+else
+  echo "Session-end hook script not found at $SESSION_END_SCRIPT — skipping."
 fi
 
 # ---------------------------------------------------------------------------
@@ -136,10 +168,11 @@ echo ""
 echo "========================================"
 echo "  claude-context-tick uninstalled"
 echo "========================================"
-[ "$SETTINGS_MODIFIED" -eq 1 ] && echo "  Settings  : hook entries removed"
-[ -n "${BACKUP:-}" ]           && echo "  Backup    : $BACKUP"
-[ "$remove_hook_script" -eq 1 ] && echo "  Hook      : removed" || echo "  Hook      : kept (or not found)"
-[ "$remove_state" -eq 1 ]      && echo "  State dir : removed" || echo "  State dir : kept (or not found)"
+[ "$SETTINGS_MODIFIED" -eq 1 ] && echo "  Settings         : hook entries removed"
+[ -n "${BACKUP:-}" ]           && echo "  Backup           : $BACKUP"
+[ "$remove_hook_script" -eq 1 ]        && echo "  Hook             : removed" || echo "  Hook             : kept (or not found)"
+[ "$remove_session_end_script" -eq 1 ] && echo "  Session-end hook : removed" || echo "  Session-end hook : kept (or not found)"
+[ "$remove_state" -eq 1 ]      && echo "  State dir        : removed" || echo "  State dir        : kept (or not found)"
 echo "========================================"
 echo ""
 

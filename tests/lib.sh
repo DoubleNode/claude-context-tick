@@ -68,3 +68,14 @@ run_hook() {
   input_json=$(printf '{"session_id":"%s","hook_event_name":"UserPromptSubmit"}' "$sid")
   env "$@" bash "$hook" <<< "$input_json"
 }
+
+# Invoke the session-end hook with a given session_id.
+# Usage: run_session_end <session_id>
+# Passes SessionEnd JSON via stdin; returns hook exit code.
+run_session_end() {
+  local sid="$1"
+  local hook="${REPO_ROOT}/hooks/session-end.sh"
+  local input_json
+  input_json=$(printf '{"session_id":"%s","hook_event_name":"SessionEnd"}' "$sid")
+  bash "$hook" <<< "$input_json"
+}
