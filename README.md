@@ -20,7 +20,7 @@ The hook injects a single-line context message `<context-tick>YYYY-MM-DD · HH:M
 - **Quarter-hour tick** — minute boundary hits 00, 15, 30, or 45
 - **Timezone shift** — DST transition or laptop traveling
 
-State is tracked per-session in `~/.claude/state/time-inject/` with atomic writes (`mktemp` + `mv`) preventing partial state corruption on abnormal exits.
+State is tracked per-session in `~/.claude/state/time-inject/` with atomic writes (`mktemp` + `mv`) preventing partial state corruption on abnormal exits. The hook also performs lazy garbage collection of stale state files: files idle for ≥7 days are pruned on a 24-hour sweep cadence, and a complementary `SessionEnd` hook deletes a session's file immediately when the session ends cleanly.
 
 ## Install
 
@@ -47,10 +47,28 @@ If you prefer to merge manually, copy the `hooks` entry from `settings.example.j
 ```json
 {
   "hooks": {
-    "userPromptSubmit": {
-      "path": "/path/to/claude-context-tick/hooks/inject-time-context.sh",
-      "enabled": true
-    }
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${HOME}/.claude/hooks/inject-time-context.sh"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${HOME}/.claude/hooks/session-end.sh"
+          }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -66,6 +84,8 @@ Environment variable to control behavior:
 | `CLAUDE_TIME_INJECT` | `1` | Set to `0` to disable the hook entirely (all injections suppressed) |
 
 Example: `CLAUDE_TIME_INJECT=0 claude` launches a session with no time injections.
+
+Note: Garbage collection behavior (7-day retention, 24-hour sweep cadence) is not currently configurable. Future versions may expose these via environment variables.
 
 ## How It Decides Whether to Inject (State-Tracking Explainer)
 
@@ -95,13 +115,27 @@ The state file format is simple JSON:
 
 The `reason` field documents why the injection fired (useful for debugging).
 
+## Garbage Collection
+
+Without automated cleanup, every Claude Code session leaves behind a state file. Over weeks or months, a long-lived developer can accumulate hundreds of idle files, wasting disk space and cluttering the state directory.
+
+The hook implements a two-pronged GC strategy:
+
+**SessionEnd hook** — When a Claude Code session ends cleanly, the `SessionEnd` hook fires and deletes only that session's state file. This is precise, prompt, and race-free: no concurrent prompts, no sweep logic, just `rm -f ~/.claude/state/time-inject/{SESSION_ID}.json`.
+
+**Lazy sweep** — Sessions that end abnormally (hard kill, OS crash, reboot before hook fires) leave orphan files. The `inject-time-context.sh` hook runs a backstop: once per 24 hours, it prunes any state file with mtime older than 7 days. This is rate-limited via a marker file (`${STATE_DIR}/.gc-sweep`) to avoid scanning the directory on every single prompt.
+
+**Liveness signal** — Every prompt submission, even when no injection fires, `touch`-updates the state file's mtime. This ensures a long-running but quiet session (stuck on a single task for 8 hours within a quarter-hour window) is not mistakenly swept away.
+
+**Configuration** — The retention threshold (7 days) and sweep interval (24 hours) are fixed at compile time. There are no environment variable overrides; this design choice prioritizes zero-config simplicity. If you need immediate cleanup, simply `rm -rf ~/.claude/state/time-inject/` at any time. The hook will recreate the directory on its next run.
+
 ## Uninstall
 
 ```bash
 bash scripts/uninstall.sh
 ```
 
-This removes the hook entry from `~/.claude/settings.json`. The state directory `~/.claude/state/time-inject/` is left in place (can be manually removed if desired).
+This removes both the `UserPromptSubmit` and `SessionEnd` hook entries from `~/.claude/settings.json`, and deletes the installed hook scripts. The state directory `~/.claude/state/time-inject/` is left in place (can be manually removed if desired).
 
 ## Troubleshooting
 
