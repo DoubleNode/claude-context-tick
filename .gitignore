@@ -14,3 +14,6 @@ tests/.state/
 # Local-only
 .env
 .env.local
+
+# Local asciinema recordings (canonical artifact lives at asciinema.org)
+*.cast
