@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `scripts/generate-social-preview.py` — Pillow-based generator for the GitHub social preview / Open Graph card. Re-runnable; portable font fallback chain (JetBrains Mono → SF Mono → Menlo → DejaVu).
+- `assets/social-preview.png` — 1280×640 social preview card. Uploaded to repo Settings → Social preview to replace the default grey link unfurl.
+
 ## [0.2.0] - 2026-05-06
 
 ### Added
