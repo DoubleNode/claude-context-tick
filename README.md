@@ -7,7 +7,7 @@
 
 A Claude Code UserPromptSubmit hook that injects wall-clock time into conversation context at meaningful boundaries.
 
-[![asciicast: claude-context-tick gating logic in 4 scenes](https://asciinema.org/a/scaWlzuee6nnuNyN.svg)](https://asciinema.org/a/scaWlzuee6nnuNyN)
+[![asciicast: claude-context-tick gating logic in 4 scenes](https://asciinema.org/a/scaWlzuee6nnuNyN.png)](https://asciinema.org/a/scaWlzuee6nnuNyN)
 
 *~22 sec demo: first-run injection → silent rerun (state matches) → fast-forward state → quarter-hour-tick injection. Reproduce locally with `bash scripts/demo.sh`.*
 
