@@ -7,6 +7,10 @@
 
 A Claude Code UserPromptSubmit hook that injects wall-clock time into conversation context at meaningful boundaries.
 
+[![asciicast: claude-context-tick gating logic in 4 scenes](https://asciinema.org/a/scaWlzuee6nnuNyN.svg)](https://asciinema.org/a/scaWlzuee6nnuNyN)
+
+*~22 sec demo: first-run injection → silent rerun (state matches) → fast-forward state → quarter-hour-tick injection. Reproduce locally with `bash scripts/demo.sh`.*
+
 ## Why
 
 Claude has no built-in concept of wall-clock time mid-conversation. The model's "today's date" comes from the system prompt at session start, but after that, subjective time inside the conversation drifts. Agents lose track of date rollovers, scheduled wake-ups, quarter-hourly pacing, and timezone shifts. This hook nudges Claude with a tiny ground-truth timestamp only when the answer to "what time is it actually" has materially changed — minimizing token cost while keeping the agent grounded.

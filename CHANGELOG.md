@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `scripts/generate-social-preview.py` — Pillow-based generator for the GitHub social preview / Open Graph card. Re-runnable; portable font fallback chain (JetBrains Mono → SF Mono → Menlo → DejaVu).
 - `assets/social-preview.png` — 1280×640 social preview card. Uploaded to repo Settings → Social preview to replace the default grey link unfurl.
+- `scripts/demo.sh` — reproducible mechanism demo (~22 sec): first-run injection → silent rerun → fast-forward state → quarter-hour-tick injection. Cross-platform (BSD/GNU `date`); self-cleans state on exit.
+- README: asciinema cast embed above the "Why" section showing the gating logic in 4 scenes ([asciinema.org/a/scaWlzuee6nnuNyN](https://asciinema.org/a/scaWlzuee6nnuNyN)).
 
 ## [0.2.0] - 2026-05-06
 
